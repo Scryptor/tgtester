@@ -25,7 +25,7 @@ type Client struct {
 }
 
 // NewClient создает новый клиент Telegram
-func NewClient(timeout time.Duration, proxyURL string, logFunc LogFunc) (*Client, error) {
+func NewClient(timeout time.Duration, proxyURL string, disableKeepAlive bool, logFunc LogFunc) (*Client, error) {
 	// Создаём кастомный dialer с логированием
 	baseDialer := &net.Dialer{
 		Timeout:   30 * time.Second,
@@ -56,6 +56,11 @@ func NewClient(timeout time.Duration, proxyURL string, logFunc LogFunc) (*Client
 		ExpectContinueTimeout: 1 * time.Second,
 		MaxIdleConns:          10,
 		IdleConnTimeout:       90 * time.Second,
+		DisableKeepAlives:     disableKeepAlive,
+	}
+
+	if disableKeepAlive {
+		logFunc("info", "🔄 Keep-Alive отключён: каждый запрос будет использовать новое соединение")
 	}
 
 	if proxyURL != "" {

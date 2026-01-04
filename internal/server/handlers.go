@@ -99,7 +99,7 @@ func (s *Server) Start(w http.ResponseWriter, r *http.Request) {
 		s.log(level, message)
 	}
 
-	client, err := telegram.NewClient(s.config.Timeout, s.config.ProxyURL, logFunc)
+	client, err := telegram.NewClient(s.config.Timeout, s.config.ProxyURL, s.config.DisableKeepAlive, logFunc)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Ошибка создания клиента: %v", err), http.StatusInternalServerError)
 		return

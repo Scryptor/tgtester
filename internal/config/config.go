@@ -6,12 +6,13 @@ import (
 
 // Config содержит все настройки приложения
 type Config struct {
-	ProxyURL        string
-	Timeout         time.Duration
-	Interval        time.Duration
-	ChatID          string
-	BotToken        string
-	MessageThreadID string
+	ProxyURL         string        `json:"proxyURL"`
+	Timeout          time.Duration `json:"timeout"`
+	Interval         time.Duration `json:"interval"`
+	ChatID           string        `json:"chatID"`
+	BotToken         string        `json:"botToken"`
+	MessageThreadID  string        `json:"messageThreadID"`
+	DisableKeepAlive bool          `json:"disableKeepAlive"`
 }
 
 // Validate проверяет обязательные поля конфигурации

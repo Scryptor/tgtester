@@ -89,6 +89,13 @@
                     <input type="number" x-model.number="config.interval" min="0.1" step="0.1"
                            class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500">
                 </div>
+                <div class="flex items-center">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" x-model="config.disableKeepAlive"
+                               class="w-4 h-4 rounded bg-gray-700 border-gray-600 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800">
+                        <span class="text-xs text-gray-400">Новое соединение на каждый запрос</span>
+                    </label>
+                </div>
                 <div class="flex items-end">
                     <button type="submit" :disabled="loading"
                             class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded text-sm font-medium">
@@ -266,7 +273,8 @@
                     messageThreadID: '',
                     proxyURL: '',
                     timeout: 60,
-                    interval: 3
+                    interval: 3,
+                    disableKeepAlive: false
                 },
                 logs: [],
                 eventSource: null,
@@ -314,7 +322,8 @@
                             messageThreadID: data.messageThreadID || '',
                             proxyURL: data.proxyURL || '',
                             timeout: data.timeout ? data.timeout / 1e9 : 60,
-                            interval: data.interval ? data.interval / 1e9 : 3
+                            interval: data.interval ? data.interval / 1e9 : 3,
+                            disableKeepAlive: data.disableKeepAlive || false
                         };
                     } catch (error) {
                         this.addLog('error', 'Ошибка загрузки конфигурации: ' + error.message);
@@ -343,7 +352,8 @@
                                 messageThreadID: this.config.messageThreadID,
                                 proxyURL: this.config.proxyURL,
                                 timeout: this.config.timeout * 1e9,
-                                interval: this.config.interval * 1e9
+                                interval: this.config.interval * 1e9,
+                                disableKeepAlive: this.config.disableKeepAlive
                             })
                         });
 
