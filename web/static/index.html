@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SendMsgTestForTG - Отладка</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        .log-entry { font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; }
+        .log-separator {
+            background: linear-gradient(90deg, #4a5568 0%, transparent 100%);
+            height: 1px;
+            margin: 8px 0;
+        }
+        .log-container::-webkit-scrollbar { width: 8px; }
+        .log-container::-webkit-scrollbar-track { background: #1a202c; }
+        .log-container::-webkit-scrollbar-thumb { background: #4a5568; border-radius: 4px; }
+        .log-container::-webkit-scrollbar-thumb:hover { background: #718096; }
+        .highlight { background-color: rgba(251, 191, 36, 0.3); }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+    <div x-data="app()" x-init="init()" class="h-screen flex flex-col">
+
+        <!-- Header -->
+        <header class="bg-gray-800 border-b border-gray-700 px-4 py-3 flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-4">
+                <h1 class="text-xl font-bold text-white">SendMsgTestForTG</h1>
+                <div class="flex items-center gap-2">
+                    <div :class="status.running ? 'bg-green-500' : 'bg-gray-500'"
+                         class="w-2.5 h-2.5 rounded-full animate-pulse"></div>
+                    <span class="text-sm" :class="status.running ? 'text-green-400' : 'text-gray-400'"
+                          x-text="status.running ? 'Работает' : 'Остановлено'"></span>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button @click="showSettings = !showSettings"
+                        class="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 rounded flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    Настройки
+                </button>
+                <button @click="start()"
+                        :disabled="status.running || loading"
+                        class="px-4 py-1.5 text-sm bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-medium">
+                    Запустить
+                </button>
+                <button @click="stop()"
+                        :disabled="!status.running || loading"
+                        class="px-4 py-1.5 text-sm bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-medium">
+                    Остановить
+                </button>
+            </div>
+        </header>
+
+        <!-- Settings Panel (collapsible) -->
+        <div x-show="showSettings" x-collapse class="bg-gray-800 border-b border-gray-700 px-4 py-4 flex-shrink-0">
+            <form @submit.prevent="updateConfig()" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Chat ID *</label>
+                    <input type="text" x-model="config.chatID" required
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Bot Token *</label>
+                    <input type="password" x-model="config.botToken" required
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Thread ID</label>
+                    <input type="text" x-model="config.messageThreadID" placeholder="Опционально"
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Прокси URL</label>
+                    <input type="text" x-model="config.proxyURL" placeholder="http://host:port"
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Таймаут (сек)</label>
+                    <input type="number" x-model.number="config.timeout" min="1"
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-1">Интервал (сек)</label>
+                    <input type="number" x-model.number="config.interval" min="0.1" step="0.1"
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" :disabled="loading"
+                            class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded text-sm font-medium">
+                        Сохранить
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Stats Bar -->
+        <div class="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between flex-shrink-0 text-sm">
+            <div class="flex items-center gap-6">
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400">Запросов:</span>
+                    <span class="font-mono text-white" x-text="stats.total"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400">Успешных:</span>
+                    <span class="font-mono text-green-400" x-text="stats.success"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400">Ошибок:</span>
+                    <span class="font-mono text-red-400" x-text="stats.errors"></span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400">Записей в логе:</span>
+                    <span class="font-mono text-gray-300" x-text="filteredLogs.length"></span>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <!-- Search -->
+                <div class="relative">
+                    <input type="text" x-model="searchQuery" placeholder="Поиск в логах..."
+                           class="w-48 px-3 py-1 pl-8 bg-gray-700 border border-gray-600 rounded text-sm focus:outline-none focus:border-blue-500">
+                    <svg class="w-4 h-4 absolute left-2 top-1.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <!-- Level Filters -->
+                <div class="flex items-center gap-1">
+                    <button @click="toggleFilter('info')"
+                            :class="filters.info ? 'bg-green-600' : 'bg-gray-700'"
+                            class="px-2 py-1 rounded text-xs font-medium hover:opacity-80">
+                        INFO
+                    </button>
+                    <button @click="toggleFilter('warn')"
+                            :class="filters.warn ? 'bg-yellow-600' : 'bg-gray-700'"
+                            class="px-2 py-1 rounded text-xs font-medium hover:opacity-80">
+                        WARN
+                    </button>
+                    <button @click="toggleFilter('error')"
+                            :class="filters.error ? 'bg-red-600' : 'bg-gray-700'"
+                            class="px-2 py-1 rounded text-xs font-medium hover:opacity-80">
+                        ERROR
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Controls -->
+        <div class="bg-gray-850 border-b border-gray-700 px-4 py-2 flex items-center justify-between flex-shrink-0 text-sm" style="background: #1e2433;">
+            <div class="flex items-center gap-3">
+                <button @click="paused = !paused"
+                        :class="paused ? 'text-yellow-400' : 'text-gray-400'"
+                        class="flex items-center gap-1 hover:text-white">
+                    <svg x-show="!paused" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                    </svg>
+                    <svg x-show="paused" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                    </svg>
+                    <span x-text="paused ? 'Продолжить' : 'Пауза'"></span>
+                </button>
+                <button @click="autoScroll = !autoScroll"
+                        :class="autoScroll ? 'text-blue-400' : 'text-gray-400'"
+                        class="flex items-center gap-1 hover:text-white">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                    </svg>
+                    <span>Автопрокрутка</span>
+                </button>
+                <button @click="wrapLines = !wrapLines"
+                        :class="wrapLines ? 'text-purple-400' : 'text-gray-400'"
+                        class="flex items-center gap-1 hover:text-white">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                    </svg>
+                    <span>Перенос</span>
+                </button>
+            </div>
+            <div class="flex items-center gap-2">
+                <button @click="exportLogs()" class="text-gray-400 hover:text-white flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    Экспорт
+                </button>
+                <button @click="logs = []; stats = {total: 0, success: 0, errors: 0}"
+                        class="text-gray-400 hover:text-white flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                    Очистить
+                </button>
+            </div>
+        </div>
+
+        <!-- Log Area -->
+        <div class="flex-1 overflow-hidden bg-gray-900">
+            <div x-ref="logContainer"
+                 class="log-container h-full overflow-y-auto p-4 text-sm"
+                 :class="wrapLines ? '' : 'overflow-x-auto whitespace-nowrap'">
+
+                <template x-for="log in filteredLogs" :key="log.id">
+                    <div class="log-entry py-0.5"
+                         :class="{
+                             'highlight': searchQuery && log.message.toLowerCase().includes(searchQuery.toLowerCase())
+                         }">
+                        <!-- Separator for request blocks -->
+                        <template x-if="log.message.includes('----------')">
+                            <div class="log-separator mt-4 mb-2"></div>
+                        </template>
+
+                        <div class="flex">
+                            <span class="text-gray-500 select-none mr-3 flex-shrink-0" x-text="formatTime(log.time)"></span>
+                            <span class="flex-shrink-0 w-14 mr-2"
+                                  :class="{
+                                      'text-green-400': log.level === 'info',
+                                      'text-yellow-400': log.level === 'warn',
+                                      'text-red-400': log.level === 'error'
+                                  }"
+                                  x-text="'[' + log.level.toUpperCase() + ']'"></span>
+                            <span :class="{
+                                      'text-gray-300': log.level === 'info',
+                                      'text-yellow-300': log.level === 'warn',
+                                      'text-red-300': log.level === 'error',
+                                      'text-blue-400 font-semibold': log.message.includes('РЕЗУЛЬТАТ'),
+                                      'text-cyan-400': log.message.includes('DNS') || log.message.includes('TCP') || log.message.includes('TLS'),
+                                      'text-purple-400': log.message.includes('Запрос #')
+                                  }"
+                                  x-text="log.message"></span>
+                        </div>
+                    </div>
+                </template>
+
+                <div x-show="filteredLogs.length === 0" class="text-gray-500 text-center py-8">
+                    <svg class="w-12 h-12 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <p>Логи появятся здесь после запуска</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="bg-gray-800 border-t border-gray-700 px-4 py-1 text-xs flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-2">
+                <div :class="connected ? 'bg-green-500' : 'bg-red-500'" class="w-2 h-2 rounded-full"></div>
+                <span class="text-gray-400" x-text="connected ? 'SSE подключено' : 'SSE отключено'"></span>
+            </div>
+            <div class="text-gray-500">
+                <span x-text="paused ? '⏸ Пауза' : ''"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function app() {
+            return {
+                loading: false,
+                status: { running: false },
+                config: {
+                    chatID: '',
+                    botToken: '',
+                    messageThreadID: '',
+                    proxyURL: '',
+                    timeout: 60,
+                    interval: 3
+                },
+                logs: [],
+                eventSource: null,
+                connected: false,
+                showSettings: true,
+                paused: false,
+                autoScroll: true,
+                wrapLines: true,
+                searchQuery: '',
+                filters: {
+                    info: true,
+                    warn: true,
+                    error: true
+                },
+                stats: {
+                    total: 0,
+                    success: 0,
+                    errors: 0
+                },
+
+                get filteredLogs() {
+                    return this.logs.filter(log => {
+                        if (!this.filters[log.level]) return false;
+                        if (this.searchQuery) {
+                            return log.message.toLowerCase().includes(this.searchQuery.toLowerCase());
+                        }
+                        return true;
+                    });
+                },
+
+                async init() {
+                    await this.loadConfig();
+                    await this.loadStatus();
+                    this.startLogs();
+                    setInterval(() => this.loadStatus(), 2000);
+                },
+
+                async loadConfig() {
+                    try {
+                        const response = await fetch('/api/config');
+                        const data = await response.json();
+                        this.config = {
+                            chatID: data.chatID || '',
+                            botToken: data.botToken || '',
+                            messageThreadID: data.messageThreadID || '',
+                            proxyURL: data.proxyURL || '',
+                            timeout: data.timeout ? data.timeout / 1e9 : 60,
+                            interval: data.interval ? data.interval / 1e9 : 3
+                        };
+                    } catch (error) {
+                        this.addLog('error', 'Ошибка загрузки конфигурации: ' + error.message);
+                    }
+                },
+
+                async loadStatus() {
+                    try {
+                        const response = await fetch('/api/status');
+                        const data = await response.json();
+                        this.status = data;
+                    } catch (error) {
+                        console.error('Ошибка загрузки статуса:', error);
+                    }
+                },
+
+                async updateConfig() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('/api/config/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                chatID: this.config.chatID,
+                                botToken: this.config.botToken,
+                                messageThreadID: this.config.messageThreadID,
+                                proxyURL: this.config.proxyURL,
+                                timeout: this.config.timeout * 1e9,
+                                interval: this.config.interval * 1e9
+                            })
+                        });
+
+                        if (!response.ok) {
+                            const error = await response.text();
+                            throw new Error(error);
+                        }
+
+                        this.addLog('info', 'Настройки сохранены');
+                    } catch (error) {
+                        this.addLog('error', 'Ошибка сохранения: ' + error.message);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async start() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('/api/start', { method: 'POST' });
+                        if (!response.ok) {
+                            const error = await response.text();
+                            throw new Error(error);
+                        }
+                        await this.loadStatus();
+                        this.showSettings = false; // Скрыть настройки при запуске
+                    } catch (error) {
+                        this.addLog('error', 'Ошибка запуска: ' + error.message);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async stop() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('/api/stop', { method: 'POST' });
+                        if (!response.ok) {
+                            const error = await response.text();
+                            throw new Error(error);
+                        }
+                        await this.loadStatus();
+                    } catch (error) {
+                        this.addLog('error', 'Ошибка остановки: ' + error.message);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                startLogs() {
+                    if (this.eventSource) {
+                        this.eventSource.close();
+                    }
+
+                    this.eventSource = new EventSource('/api/logs');
+
+                    this.eventSource.onopen = () => {
+                        this.connected = true;
+                    };
+
+                    this.eventSource.onmessage = (event) => {
+                        if (this.paused) return;
+
+                        try {
+                            const data = JSON.parse(event.data);
+                            if (data.type === 'ping') return;
+                            this.addLog(data.level, data.message);
+
+                            // Обновляем статистику
+                            if (data.message.includes('РЕЗУЛЬТАТ')) {
+                                this.stats.total++;
+                                if (data.message.includes('УСПЕХ')) {
+                                    this.stats.success++;
+                                } else if (data.message.includes('ОШИБКА')) {
+                                    this.stats.errors++;
+                                }
+                            }
+                        } catch (error) {
+                            console.error('Ошибка парсинга лога:', error);
+                        }
+                    };
+
+                    this.eventSource.onerror = () => {
+                        this.connected = false;
+                        setTimeout(() => this.startLogs(), 3000);
+                    };
+                },
+
+                addLog(level, message) {
+                    this.logs.push({
+                        id: Date.now() + Math.random(),
+                        time: new Date(),
+                        level,
+                        message
+                    });
+
+                    // Ограничиваем количество логов
+                    if (this.logs.length > 5000) {
+                        this.logs = this.logs.slice(-4000);
+                    }
+
+                    if (this.autoScroll) {
+                        this.$nextTick(() => {
+                            const container = this.$refs.logContainer;
+                            if (container) {
+                                container.scrollTop = container.scrollHeight;
+                            }
+                        });
+                    }
+                },
+
+                toggleFilter(level) {
+                    this.filters[level] = !this.filters[level];
+                },
+
+                formatTime(date) {
+                    if (!date) return '';
+                    const d = new Date(date);
+                    return d.toLocaleTimeString('ru-RU', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        fractionalSecondDigits: 3
+                    });
+                },
+
+                exportLogs() {
+                    const content = this.logs.map(log =>
+                        `${this.formatTime(log.time)} [${log.level.toUpperCase()}] ${log.message}`
+                    ).join('\n');
+
+                    const blob = new Blob([content], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `logs_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
